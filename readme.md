@@ -5,9 +5,6 @@ Sistem pendataan penduduk & keluarga skala kelurahan/desa. Web app dua sub-proye
 - [`backend_golang/`](backend_golang/) — REST API (Go + Gin + GORM + MySQL)
 - [`frontend_vuetify/`](frontend_vuetify/) — SPA (Vue 3 + Vuetify + Pinia + Vite)
 
-> Folder `BACKEND LARAVEL/` ada di repo tapi **tidak dipakai** — abaikan.
-
-> ⚠ Sebelum deploy ke production, **wajib baca [AUDIT.md](AUDIT.md)** — ada beberapa kelemahan keamanan kritis (IDOR, mass assignment, JWT secret hardcoded) yang harus diperbaiki dulu.
 
 ---
 
