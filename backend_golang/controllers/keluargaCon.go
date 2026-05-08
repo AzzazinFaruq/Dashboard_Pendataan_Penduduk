@@ -212,6 +212,8 @@ func LatestForInput(c *gin.Context) {
 func GetKeluargaByID(c *gin.Context) {
 	id := c.Param("id")
 
+	
+
 	var keluarga models.Keluarga
 	if err := setup.DB.First(&keluarga, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Data tidak ditemukan"})

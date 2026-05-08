@@ -56,10 +56,10 @@ func AliveCount(c *gin.Context) {
 
 	if user.Level == "admin" {
 		setup.DB.Model(&models.Penduduk{}).Where("status = ?", 1).Count(&alivepend)
-		setup.DB.Model(&models.Penduduk{}).Where("status = ?", 0).Count(&nopen)
+		setup.DB.Model(&models.Penduduk{}).Where("status = ?", 2).Count(&nopen)
 	} else {
 		setup.DB.Model(&models.Penduduk{}).Where("user_id = ?", user.Id).Where("status = ?", 1).Count(&alivepend)
-		setup.DB.Model(&models.Penduduk{}).Where("user_id = ?", user.Id).Where("status = ?", 0).Count(&nopen)
+		setup.DB.Model(&models.Penduduk{}).Where("user_id = ?", user.Id).Where("status = ?", 2).Count(&nopen)
 	}
 
 	c.Keys["response"] = gin.H{"alivepend": alivepend, "nopen": nopen}
