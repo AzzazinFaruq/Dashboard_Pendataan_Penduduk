@@ -5,6 +5,7 @@ import (
 	"backend_golang/models"
 	"backend_golang/setup"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -350,6 +351,19 @@ func AddKeluarga(c *gin.Context) {
 		isComplete = false
 	}
 
+	// Track file yang sudah ditulis ke disk; kalau tx gagal / return early
+	// sebelum commit, defer akan menghapusnya supaya tidak jadi orphan.
+	var savedPaths []string
+	committed := false
+	defer func() {
+		if committed {
+			return
+		}
+		for _, p := range savedPaths {
+			_ = os.Remove(p)
+		}
+	}()
+
 	fotoKk, err := c.FormFile("foto_kk")
 	if err == nil {
 		if !strings.HasSuffix(strings.ToLower(fotoKk.Filename), ".jpg") &&
@@ -369,6 +383,7 @@ func AddKeluarga(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Gagal menyimpan foto"})
 			return
 		}
+		savedPaths = append(savedPaths, uploadPath)
 		keluarga.FotoKk = uploadPath
 	} else {
 		isComplete = false
@@ -393,6 +408,7 @@ func AddKeluarga(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Gagal menyimpan foto"})
 			return
 		}
+		savedPaths = append(savedPaths, uploadPath)
 		keluarga.FotoRumah = uploadPath
 	} else {
 		isComplete = false
@@ -424,7 +440,11 @@ func AddKeluarga(c *gin.Context) {
 		return
 	}
 
-	tx.Commit()
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyimpan data"})
+		return
+	}
+	committed = true
 	setup.DB.Preload("User").First(&newKeluarga, newKeluarga.Id)
 
 	c.JSON(http.StatusCreated, gin.H{
