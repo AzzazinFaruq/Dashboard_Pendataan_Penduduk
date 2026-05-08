@@ -22,3 +22,6 @@ desktop.ini
 /backend_golang/tmp/
 /backend_golang/public/uploads/*
 !/backend_golang/public/uploads/.gitkeep
+
+# Laravel backend (tidak dipakai di project ini)
+/BACKEND LARAVEL/
