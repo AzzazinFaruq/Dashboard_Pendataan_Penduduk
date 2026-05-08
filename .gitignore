@@ -1,2 +1,24 @@
-db_project_pendataan_penduduk.sql
+# Database dumps
+*.sql
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Go backend
 /backend_golang/.env
+/backend_golang/*.exe
+/backend_golang/main
+/backend_golang/tmp/
+/backend_golang/public/uploads/*
+!/backend_golang/public/uploads/.gitkeep
