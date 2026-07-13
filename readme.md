@@ -61,6 +61,7 @@ DB_PASSWORD=
 DB_HOST=localhost
 DB_PORT=3306
 DB_NAME=project_pendataan_penduduk
+JWT_SECRET=   # WAJIB diisi (mis. `openssl rand -hex 32`), backend menolak jalan tanpa ini
 ```
 
 Saat startup pertama, seeder otomatis bikin akun admin:
@@ -81,7 +82,7 @@ npm run dev            # listen di :3000
 
 Buka `http://localhost:3000` dan login dengan kredensial admin di atas.
 
-> Base URL backend di-hardcode di [src/main.js:42](frontend_vuetify/src/main.js#L42). Kalau backend pindah host, edit di sana.
+> Base URL backend dibaca dari `VITE_API_URL` (lihat `frontend_vuetify/.env.example`). Default `http://localhost:8080` jika tidak diisi.
 
 ---
 

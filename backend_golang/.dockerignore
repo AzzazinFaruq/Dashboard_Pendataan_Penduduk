@@ -1,0 +1,8 @@
+.env
+*.exe
+app
+main
+tmp/
+public/uploads/*
+!public/uploads/.gitkeep
+README.md
