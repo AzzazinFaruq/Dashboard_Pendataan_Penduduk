@@ -1,313 +1,189 @@
-# Project Pendataan Penduduk
+<div align="center">
 
-Sistem pendataan penduduk & keluarga skala kelurahan/desa. Web app dua sub-proyek:
+# 🏘️ Dashboard Pendataan Penduduk
 
-- [`backend_golang/`](backend_golang/) — REST API (Go + Gin + GORM + MySQL)
-- [`frontend_vuetify/`](frontend_vuetify/) — SPA (Vue 3 + Vuetify + Pinia + Vite)
+**Sistem pendataan penduduk & keluarga skala kelurahan/desa**
 
+[![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)](.github/workflows/ci.yml)
+[![Go](https://img.shields.io/badge/Go-1.23-00ADD8?logo=go&logoColor=white)](backend_golang/)
+[![Vue](https://img.shields.io/badge/Vue-3.4-4FC08D?logo=vuedotjs&logoColor=white)](frontend_vuetify/)
+[![Vuetify](https://img.shields.io/badge/Vuetify-3.6-1867C0?logo=vuetify&logoColor=white)](frontend_vuetify/)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)](#database)
+[![Docker](https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
 
----
+Aplikasi web dua sub-proyek: REST API **Go + Gin + GORM** dan SPA **Vue 3 + Vuetify + Pinia**.
 
-## Fitur
-
-- Autentikasi multi-user (login, register, logout) berbasis JWT cookie
-- Role: `admin` (akses semua data) & `user` (hanya data milik sendiri)
-- Manajemen **Keluarga**: CRUD + upload foto KK & foto rumah + koordinat GPS
-- Manajemen **Penduduk**: CRUD lengkap dengan field demografis (NIK, agama, pendidikan, pekerjaan, dll)
-- Dashboard statistik: total keluarga/penduduk, distribusi gender, status kawin, status aktif, tren input per bulan
-- Upload & ganti foto profil user
+</div>
 
 ---
 
-## Prasyarat
+## ✨ Fitur
 
-| Tool | Versi minimum |
+| | Fitur |
 |---|---|
-| Go | 1.23+ |
-| Node.js | 18+ |
-| MySQL | 8.0+ |
-| npm | 9+ |
+| 🔐 | Autentikasi multi-user berbasis **JWT httpOnly cookie** (login, register, logout, remember-me 7 hari) |
+| 👥 | Role **`admin`** (akses semua data) & **`user`** (hanya data miliknya — dicek di setiap endpoint) |
+| 🏠 | Manajemen **Keluarga**: CRUD + upload foto KK & rumah + titik koordinat GPS (Leaflet) |
+| 🧑 | Manajemen **Penduduk**: CRUD lengkap dengan field demografis (NIK, agama, pendidikan, pekerjaan, dll) |
+| 📊 | Dashboard statistik: total keluarga/penduduk, distribusi gender, status kawin, tren input harian (ApexCharts) |
+| 🖼️ | Upload foto profil — validasi **MIME asli** + nama file acak (anti path-traversal) |
+| 📄 | Pagination opsional `?page=&limit=` pada endpoint list |
 
 ---
 
-## Quickstart
+## 🚀 Quickstart
 
-### 1. Database
+### Opsi A — Docker (paling cepat)
 
-Buat database kosong di MySQL:
+```bash
+# edit dulu JWT_SECRET & password di docker-compose.yml
+docker compose up --build
+```
+
+Frontend: `http://localhost:3000` · API: `http://localhost:8080`
+
+### Opsi B — Manual
+
+**Prasyarat:** Go 1.23+ · Node.js 18+ · MySQL 8.0+ · npm 9+
+
+**1. Database**
 
 ```sql
 CREATE DATABASE project_pendataan_penduduk;
 ```
 
-Tabel akan dibuat otomatis lewat `AutoMigrate` saat backend pertama kali jalan.
+Tabel dibuat otomatis via `AutoMigrate` saat backend pertama jalan.
 
-### 2. Backend (Go)
+**2. Backend**
 
 ```bash
 cd backend_golang
-cp .env.example .env   # buat dulu kalau belum ada
-# edit .env, isi kredensial DB
+cp .env.example .env      # isi kredensial DB + JWT_SECRET
 go mod download
-go run main.go         # listen di :8080
+go run main.go            # listen di :8080
 ```
 
-Isi `.env` minimal:
+> ⚠️ `JWT_SECRET` **wajib diisi** (mis. `openssl rand -hex 32`) — backend menolak jalan tanpa ini.
 
-```env
-FE_URL=http://localhost:3000
-DB_USERNAME=root
-DB_PASSWORD=
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=project_pendataan_penduduk
-JWT_SECRET=   # WAJIB diisi (mis. `openssl rand -hex 32`), backend menolak jalan tanpa ini
+**3. Frontend**
+
+```bash
+cd frontend_vuetify
+cp .env.example .env      # opsional; default API http://localhost:8080
+npm install
+npm run dev               # listen di :3000
 ```
 
-Saat startup pertama, seeder otomatis bikin akun admin:
+**4. Login**
+
+Seeder membuat akun admin default:
 
 | Email | Password |
 |---|---|
 | `admin@gmail.com` | `admin123` |
 
-> **Ganti password admin segera** setelah login pertama.
-
-### 3. Frontend (Vuetify)
-
-```bash
-cd frontend_vuetify
-npm install
-npm run dev            # listen di :3000
-```
-
-Buka `http://localhost:3000` dan login dengan kredensial admin di atas.
-
-> Base URL backend dibaca dari `VITE_API_URL` (lihat `frontend_vuetify/.env.example`). Default `http://localhost:8080` jika tidak diisi.
+> 🔒 **Segera ganti password admin** setelah login pertama.
 
 ---
 
-## Script
-
-### Backend
-
-```bash
-go run main.go         # dev
-go build -o app         # build binary
-```
-
-### Frontend
-
-```bash
-npm run dev      # vite dev server (port 3000)
-npm run build    # production bundle ke dist/
-npm run preview  # preview hasil build
-npm run lint     # eslint --fix
-```
-
----
-
-## Struktur repo
+## 📁 Struktur Repo
 
 ```
-Project-one-fixed/
-├── backend_golang/         # Go API
-│   ├── main.go             # entrypoint + register route
-│   ├── setup/              # GORM connect + AutoMigrate + seed
-│   ├── seeders/            # admin default
-│   ├── config/             # enum + helper Get*()
-│   ├── middlewares/        # CORS, JWT auth
-│   ├── models/             # User, Keluarga, Penduduk
-│   ├── controllers/        # auth, user, keluarga, penduduk, universal (statistik)
-│   ├── utils/              # JWT generate/validate
-│   └── public/uploads/     # foto-kk, foto-rumah, profile_pictures
-├── frontend_vuetify/       # Vue 3 SPA
+Dashboard_Pendataan_Penduduk/
+├── backend_golang/            # 🟦 REST API (Go)
+│   ├── main.go                #    entrypoint + daftar route
+│   ├── config/                #    enum demografis + helper Get*()
+│   ├── controllers/           #    handler (auth, user, keluarga, penduduk, statistik)
+│   │   └── helper.go          #    getCurrentUser / isAdmin / canAccessResource
+│   ├── middlewares/           #    CORS + JWT auth
+│   ├── models/                #    User, Keluarga, Penduduk (GORM)
+│   ├── seeders/               #    admin default
+│   ├── setup/                 #    koneksi DB + AutoMigrate
+│   ├── utils/                 #    JWT + validasi upload gambar
+│   └── Dockerfile
+├── frontend_vuetify/          # 🟩 SPA (Vue 3)
 │   ├── src/
-│   │   ├── pages/          # auto-route (login, dashboard, penduduk, keluarga, dll)
-│   │   ├── components/     # navbar, card, dtTable, chart/, modal/
-│   │   ├── stores/         # Pinia (constant, nav, restrict, title)
-│   │   ├── plugins/        # vuetify config + register
-│   │   ├── styles/         # SCSS settings + global CSS
-│   │   └── main.js         # bootstrap (axios, pinia, sweetalert2, apexcharts)
-│   ├── vite.config.mjs
-│   └── package.json
-├── AUDIT.md                # daftar kelemahan & TODO perbaikan
-└── readme.md
+│   │   ├── pages/             #    auto-route: login, dashboard, penduduk/, keluarga/, profile
+│   │   ├── components/        #    navbar, card, dtTable, chart/, modal/
+│   │   ├── stores/            #    Pinia: constant, restrict, title
+│   │   ├── router/            #    auto-router + global auth guard
+│   │   └── plugins/           #    registrasi Vuetify
+│   ├── Dockerfile             #    build Vite → nginx
+│   └── nginx.conf
+├── docker-compose.yml         # 🐳 MySQL + backend + frontend
+├── .github/workflows/ci.yml   # ⚙️ CI: vet/build/test Go + build Vite
+└── TODO.md                    # ✅ checklist audit & perbaikan
 ```
 
 ---
 
-## Tech stack
+## 🔌 API
 
-### Backend
+Dokumentasi endpoint lengkap ada di **[backend_golang/README.md](backend_golang/README.md)**. Ringkasan:
 
-| Komponen | Versi |
+| Grup | Endpoint |
 |---|---|
-| Go | 1.23.2 |
-| Gin | v1.10.0 |
-| GORM | v1.25.12 (driver MySQL v1.5.7) |
-| jwt/v5 | v5.2.1 (HS256) |
-| godotenv | v1.5.1 |
-| bcrypt | `golang.org/x/crypto` |
-
-### Frontend
-
-| Komponen | Versi |
-|---|---|
-| Vue | 3.4.31 |
-| Vuetify | 3.6.11 |
-| Vue Router | 4.4.0 (auto-routing via `unplugin-vue-router`) |
-| Pinia | 2.1.7 |
-| Vite | 5.1.5 |
-| Axios | 1.7.7 + `axios-retry` 4.5.0 |
-| ApexCharts, Chart.js | charting |
-| Leaflet, vue-leaflet | peta lat/long keluarga |
-| vue-sweetalert2 | toast/alert |
+| **Publik** | `POST /register` · `POST /login` · `GET /public/*` (file upload) |
+| **Auth & User** | `POST /api/logout` · `GET /api/user` · `GET /api/user/all` (admin) · `PUT /api/update/:id` · `PUT /api/update/password/:id` |
+| **Keluarga** | `GET/POST/PUT/DELETE /api/{keluarga,addkeluarga,editkeluarga/:id,deletekeluarga/:id}` · `GET /api/latestkel` |
+| **Penduduk** | `GET/POST/PUT/DELETE /api/{penduduk,addpenduduk,updatependuduk/:id,deletependuduk/:id}` · `GET /api/latestpend` |
+| **Statistik** | `GET /api/{alldata,jumlah,alive,marry,gender}` · `GET /api/data?year=&month=` |
 
 ---
 
-## API Endpoint
+## 🔑 Alur Autentikasi
 
-### Public
+```
+login.vue ──POST /login──▶ verifikasi bcrypt ──▶ JWT HS256 (sub, exp)
+                                                    │
+   axios (withCredentials) ◀── Set-Cookie: Authorization (httpOnly) ──┘
+```
 
-| Method | Path | Deskripsi |
+- Masa berlaku token **1 hari**, atau **7 hari** dengan `remember_me` — cookie & klaim `exp` sinkron.
+- Semua route `/api/*` lewat `AuthMiddleware`; endpoint by-ID/mutasi memverifikasi **kepemilikan resource** (`canAccessResource`) — non-admin tidak bisa membaca/mengubah data user lain.
+- `user_id` data baru selalu diambil **dari token**, tidak pernah dari input client.
+- Router frontend punya guard global (`beforeEach`); pengaman sesungguhnya tetap di sisi API.
+
+---
+
+## 🗄️ Database
+
+Schema dibangun otomatis via `AutoMigrate` ([setup/setup.go](backend_golang/setup/setup.go)).
+
+| Tabel | Kolom kunci | Relasi |
 |---|---|---|
-| POST | `/register` | Registrasi user baru |
-| POST | `/login` | Login → set cookie `Authorization` |
-| GET | `/public/*` | Static file (foto upload) |
+| `users` | `email` (unique), `level`, `profile_picture` | — |
+| `keluargas` | `no_kk`, `foto_kk`, `foto_rumah`, `latitude/longtitude` | `user_id → users.id` |
+| `penduduks` | `nik`, field demografis (`int8` enum) | `user_id → users.id` · `kels_id → keluargas.id` |
 
-### Protected (`/api/*`, butuh cookie `Authorization`)
-
-<details>
-<summary>Auth & user</summary>
-
-| Method | Path | Handler |
-|---|---|---|
-| POST | `/api/logout` | `authCon.Logout` |
-| GET | `/api/user` | `authCon.GetCurrentUser` |
-| GET | `/api/user/all` | `userCon.GetAllUser` |
-| PUT | `/api/update/:id` | `userCon.UpdateUser` (form-data, foto profil ≤2MB) |
-| PUT | `/api/update/password/:id` | `userCon.PasswordUpdate` |
-
-</details>
-
-<details>
-<summary>Keluarga</summary>
-
-| Method | Path | Handler |
-|---|---|---|
-| GET | `/api/keluarga` | `keluargaCon.Index` |
-| GET | `/api/latestkel` | top 5 keluarga terbaru |
-| GET | `/api/latestkelinput` | top 1 keluarga terbaru |
-| GET | `/api/keluarga/:id` | detail keluarga |
-| POST | `/api/addkeluarga` | tambah (form-data, foto ≤5MB) |
-| PUT | `/api/editkeluarga/:id` | update |
-| DELETE | `/api/deletekeluarga/:id` | hapus |
-
-</details>
-
-<details>
-<summary>Penduduk</summary>
-
-| Method | Path | Handler |
-|---|---|---|
-| GET | `/api/penduduk` | list |
-| GET | `/api/latestpend` | latest |
-| GET | `/api/penduduk/:id` | detail |
-| POST | `/api/addpenduduk` | tambah (JSON) |
-| PUT | `/api/updatependuduk/:id` | update |
-| DELETE | `/api/deletependuduk/:id` | hapus |
-
-</details>
-
-<details>
-<summary>Statistik</summary>
-
-| Method | Path | Deskripsi |
-|---|---|---|
-| GET | `/api/alldata` | gabungan DataCount + AliveCount |
-| GET | `/api/jumlah` | total keluarga + penduduk |
-| GET | `/api/alive` | aktif vs tidak aktif |
-| GET | `/api/marry` | breakdown status kawin |
-| GET | `/api/gender` | breakdown gender |
-| GET | `/api/data?year=YYYY&month=MM` | jumlah penduduk per hari |
-
-</details>
+Enum demografis dipetakan ke string via helper di [config/constant.go](backend_golang/config/constant.go); frontend punya mirror di [stores/constant.js](frontend_vuetify/src/stores/constant.js) — **sinkronkan keduanya** bila mengubah enum.
 
 ---
 
-## Auth flow
+## 🧪 Testing & CI
 
-JWT HS256, dikirim sebagai HTTP-only cookie `Authorization`. Claim: `sub` (user id) + `exp` (24 jam, atau 7 hari kalau `remember_me=true`).
+```bash
+cd backend_golang && go test ./...     # unit test: config enum, JWT, upload helper
+```
 
-1. `pages/login.vue` → `POST /login` dengan email + password.
-2. Backend verify bcrypt → generate JWT → set cookie via `Set-Cookie`.
-3. Frontend simpan flag `localStorage.auth = 'true'` (lihat catatan keamanan), redirect `/dashboard`.
-4. Setiap request axios otomatis kirim cookie karena `withCredentials: true`.
-5. Logout: `POST /api/logout` (backend clear cookie) + clear localStorage.
-
-> **Catatan:** flag `localStorage.auth` saat ini adalah satu-satunya pemicu redirect di guard frontend. Ini rentan — user bisa set manual via DevTools dan masuk ke dashboard tanpa login (walau API call tetap akan 401). Lihat [AUDIT.md](AUDIT.md) #3-4 untuk perbaikan.
-
-### Role / level
-
-Kolom `users.level`:
-
-- `admin` — akses semua data lintas user
-- `user` — query difilter `WHERE user_id = ?`
-
-Pola filter konsisten di `Index`, `Latest`, `DataCount`, `AliveCount`, `MarryCount`, `GenderCount`, `RangeData`.
+CI (GitHub Actions) berjalan otomatis di setiap push/PR ke `main`:
+**backend** → `go vet` + `go build` + `go test` · **frontend** → `npm run build`
 
 ---
 
-## Database
+## 🛡️ Catatan Keamanan
 
-MySQL. Schema dibangun otomatis lewat `AutoMigrate` di [setup/setup.go:40-44](backend_golang/setup/setup.go#L40-L44).
+Hasil audit keamanan (lihat [TODO.md](TODO.md)) sudah ditindaklanjuti:
 
-### Tabel utama
-
-- **users** — `id, name, email (unique), password, level, profile_picture`
-- **keluargas** — `id, no_kk, kk_nama, alamat, rt, rw, kode_pos, status, foto_kk, foto_rumah, latitude, longtitude, user_id`
-- **penduduks** — `id, kels_id, nik, nama, tmp_lahir, tgl_lahir, kelamin, stat_kawin, hub_kel, warga_neg, agama, pendidikan, pekerjaan, ayah, ibu, kepala_kel, no_hp, domisili, status, user_id`
-
-### Relasi
-
-- `keluargas.user_id` → `users.id`
-- `penduduks.user_id` → `users.id`
-- `penduduks.kels_id` → `keluargas.id`
-
-Semua relasi: `ON UPDATE CASCADE`, `ON DELETE SET NULL`.
-
-### Enum
-
-Field demografis (kelamin, agama, pendidikan, pekerjaan, dll) disimpan sebagai `int8`, dipetakan ke string via helper `GetJenisKelamin`, `GetAgama`, `GetPekerjaan`, dst di [config/constant.go](backend_golang/config/constant.go).
-
-> Frontend punya pemetaan paralel di [stores/constant.js](frontend_vuetify/src/stores/constant.js). Sinkronkan kalau menambah/mengubah enum.
+- ✅ JWT secret dari environment (`JWT_SECRET`) — tidak lagi hardcode
+- ✅ IDOR ditutup: cek kepemilikan di semua endpoint by-ID & mutasi
+- ✅ Upload divalidasi berdasarkan MIME asli + nama file acak
+- ✅ `user_id` diambil dari token, bukan body request
+- ✅ `gin.Recovery()` — panic tidak mematikan server
+- ⚠️ Sisa: ganti password admin default & tambahkan rate-limiting sebelum produksi
 
 ---
 
-## Konvensi
+## 📜 Lisensi
 
-- **Foto upload** disajikan via `GET /public/uploads/...`. Frontend menyusun URL dari `baseURL + path`.
-- **Filter per-user** wajib di setiap endpoint baru — cek `user.Level == "admin"` sebelum return data.
-- **CORS** ketat ke satu origin (`FE_URL`). Update `.env` backend kalau frontend pindah port/host.
-- **Sumber tunggal enum** ada di backend (`config/constant.go`); frontend hanya mirror.
-
----
-
-## Catatan keamanan
-
-Kelemahan yang sudah teridentifikasi (perlu diperbaiki sebelum produksi):
-
-- JWT secret di-hardcode `"secret"` di [utils/token.go:11](backend_golang/utils/token.go#L11)
-- Validasi upload hanya cek ekstensi, bukan MIME
-- Password admin default `admin123`
-- IDOR di endpoint `:id` (user bisa akses data user lain)
-- Mass assignment via `ShouldBindJSON` ke struct GORM
-- `localStorage.auth` sebagai satu-satunya pemicu router guard
-
-**Daftar lengkap & rencana fix → [AUDIT.md](AUDIT.md).**
-
----
-
-## Lisensi
-
-Belum ditentukan. Tambahkan `LICENSE` sebelum publikasi.
+Belum ditentukan — tambahkan `LICENSE` sebelum publikasi.
