@@ -7,7 +7,7 @@
   >
     <v-list >
       <v-list-item-title class="logo-wrap">
-        <a href="/home">
+        <a href="/dashboard">
           <img src="../assets/logo-pendataan-black.png" alt="" class="sidebar-logo mb-3">
         </a>
       </v-list-item-title>
@@ -121,6 +121,7 @@
         width="32"
       ></v-img>
       <v-img
+        v-else
         rounded="xl"
         :src="profile_picture"
         alt=""
@@ -134,14 +135,9 @@
 
 <script>
 import axios from "axios";
-import { useRouter } from "vue-router";
 import { useTitle } from '@/stores/title'
-// import { useNav } from "@/stores/nav";
-const usenav = 'test';
-export var name ='';
 export default {
   setup() {
-    const router = useRouter();
     const title = useTitle()
     return { title }
   },
@@ -173,37 +169,38 @@ export default {
   },
   methods: {
     handleLogout() {
-      try {
-        axios.post("/api/logout").then((res) => {
+      axios.post("/api/logout")
+        .then((res) => {
           console.log("Logout response:", res.data);
           this.logout = false;
-          this.status();
           this.success = false;
-          this.$router.push("/");
           this.navlist();
-          localStorage.removeItem('auth')
+          localStorage.removeItem('auth');
+          this.$router.push("/");
+        })
+        .catch((error) => {
+          console.error("Logout gagal:", error);
+          // Tetap bersihkan sesi lokal walau request gagal.
+          localStorage.removeItem('auth');
+          this.$router.push("/");
         });
-      } catch (error) {
-        error;
-
-      }
     },
 
     status() {
-      try {
-        axios.get("/api/user").then((res) => {
+      axios.get("/api/user")
+        .then((res) => {
           this.data = res.data.data;
           this.success = res.data.success;
-          name=res.data.data.name
-          this.role=res.data.data.level
+          this.role = res.data.data.level;
           this.navlist();
-          this.profile_picture="http://localhost:8080/"+res.data.data.profile_picture;
+          const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
+          this.profile_picture = apiUrl + "/" + res.data.data.profile_picture;
+        })
+        .catch((error) => {
+          console.error("Gagal mengambil data user:", error);
+          this.success = false;
+          this.$router.push('/login');
         });
-      } catch (error) {
-        error;
-        this.success = false;
-        this.$router.push('/login')
-      }
     },
     navlist(){
       if (this.role == 'user') {

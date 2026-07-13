@@ -43,7 +43,6 @@
 <script>
 import axios from "axios";
 import Swal from 'sweetalert2'
-export var success=false;
 export default {
   data() {
     return {
@@ -109,28 +108,26 @@ export default {
       })
     },
     login() {
-      try {
-        axios.post("/login", this.form).then((res) => {
+      axios.post("/login", this.form)
+        .then((res) => {
           console.log(res.data.authenticated)
           this.success = res.data.authenticated;
-          switch (this.success) {
-            case true:
-              localStorage.setItem('auth', 'true');
-              localStorage.setItem('loginAlert', 'true');
-              success=true;
-              this.showSuccessToast('Login berhasil!')
-              setTimeout(() => {
-                this.$router.push('/dashboard')
-              }, 1000)
-              break;
-            case false:
-              this.showErrorToast(res.data.message)
-              break;
+          if (this.success) {
+            localStorage.setItem('auth', 'true');
+            localStorage.setItem('loginAlert', 'true');
+            this.showSuccessToast('Login berhasil!')
+            setTimeout(() => {
+              this.$router.push('/dashboard')
+            }, 1000)
+          } else {
+            this.showErrorToast(res.data.message)
           }
+        })
+        .catch((error) => {
+          // Kredensial salah mengembalikan 401; tampilkan pesan dari server bila ada.
+          const message = error.response?.data?.error || 'Email atau kata sandi salah';
+          this.showErrorToast(message)
         });
-      } catch (error) {
-        this.showErrorToast('Terjadi kesalahan pada sistem')
-      }
     },
   },
 };

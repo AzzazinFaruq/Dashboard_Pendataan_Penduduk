@@ -99,7 +99,8 @@ export default {
       try {
         axios.get('/api/user')
           .then((res) => {
-            this.foto = "http://localhost:8080/" + res.data.data.profile_picture;
+            const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
+            this.foto = apiUrl + "/" + res.data.data.profile_picture;
             this.userdata = res.data.data;
           })
       } catch {

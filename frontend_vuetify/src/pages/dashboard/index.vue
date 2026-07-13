@@ -83,7 +83,6 @@ import totalchart from '@/components/chart/totalchart.vue';
 import axios from 'axios'
 import card from '@/components/card.vue';
 import dtTable from '@/components/dtTable.vue';
-import { success } from '../login.vue';
 import { test } from '@/stores/restrict';
 import { useTitle } from '@/stores/title'
 const use = test();
@@ -99,7 +98,6 @@ export default {
   data() {
     return {
       loginPoUp:false,
-      notif:success,
       headpen:[
         {id:0, name:'Nomor KK / Kepala Keluarga'},
         {id:1, name:'Nomor NIK'},

@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 
 export const useCons = defineStore({
-  id: "options",
+  id: "constant",
   state: () => ({
     domisili:[
       {id:1, name:"PENDUDUK TETAP"},
