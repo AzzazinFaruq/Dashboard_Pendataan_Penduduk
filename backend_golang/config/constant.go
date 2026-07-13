@@ -1,39 +1,5 @@
 package config
 
-// StatusSurat - Status surat dan keterangannya
-var StatusSurat = map[int]string{
-	1: "Selesai",
-	2: "Diproses",
-	9: "Menunggu",
-}
-
-var StatusSuratKet = map[int]string{
-	1: "Surat telah selesai, silahkan mengambilnya di kantor %%level%%.",
-	2: "Surat telah dicetak dan menunggu tanda tangan %%kep_level%% atau yang mewakili.",
-	9: "Permohonan surat menunggu proses verifikasi oleh tim admin.",
-}
-
-// Golongan - Pangkat dan golongan
-var Golongan = map[string]string{
-	"I.a":  "Juru Muda",
-	"I.b":  "Juru Muda Tingkat I",
-	"I.c":  "Juru",
-	"I.d":  "Juru Tingkat I",
-	"II.a": "Pengatur Muda",
-	"II.b": "Pengatur Muda Tingkat I",
-	"II.c": "Pengatur",
-	"II.d": "Pengatur Tingkat I",
-	"III.a": "Penata Muda",
-	"III.b": "Penata Muda Tingkat I",
-	"III.c": "Penata",
-	"III.d": "Penata Tingkat I",
-	"IV.a": "Pembina",
-	"IV.b": "Pembina Tingkat I",
-	"IV.c": "Pembina Utama Muda",
-	"IV.d": "Pembina Utama Madya",
-	"IV.e": "Pembina Utama",
-}
-
 // JenisKelamin - Jenis kelamin
 var JenisKelamin = map[int]string{
 	1: "LAKI-LAKI",
@@ -113,7 +79,84 @@ var Pekerjaan = map[int]string{
 	8:  "PERDAGANGAN",
 	9:  "PETANI/PEKEBUN",
 	10: "PETERNAK",
-	// ... sisanya sama seperti di atas sampai 89
+	11: "NELAYAN/PERIKANAN",
+	12: "INDUSTRI",
+	13: "KONSTRUKSI",
+	14: "TRANSPORTASI",
+	15: "KARYAWAN SWASTA",
+	16: "KARYAWAN BUMN",
+	17: "KARYAWAN BUMD",
+	18: "KARYAWAN HONORER",
+	19: "BURUH HARIAN LEPAS",
+	20: "BURUH TANI/PERKEBUNAN",
+	21: "BURUH NELAYAN/PERIKANAN",
+	22: "BURUH PETERNAKAN",
+	23: "PEMBANTU RUMAH TANGGA",
+	24: "TUKANG CUKUR",
+	25: "TUKANG LISTRIK",
+	26: "TUKANG BATU",
+	27: "TUKANG KAYU",
+	28: "TUKANG SOL SEPATU",
+	29: "TUKANG LAS/PANDAI BESI",
+	30: "TUKANG JAHIT",
+	31: "TUKANG GIGI",
+	32: "PENATA RIAS",
+	33: "PENATA BUSANA",
+	34: "PENATA RAMBUT",
+	35: "MEKANIK",
+	36: "SENIMAN",
+	37: "TABIB",
+	38: "PARAJI",
+	39: "PERANCANG BUSANA",
+	40: "PENTERJEMAH",
+	41: "IMAM MASJID",
+	42: "PENDETA",
+	43: "PASTOR",
+	44: "WARTAWAN",
+	45: "USTADZ/MUBALIGH",
+	46: "JURU MASAK",
+	47: "PROMOTOR ACARA",
+	48: "ANGGOTA DPR-RI",
+	49: "ANGGOTA DPD",
+	50: "ANGGOTA BPK",
+	51: "PRESIDEN",
+	52: "WAKIL PRESIDEN",
+	53: "ANGGOTA MAHKAMAH KONSTITUSI",
+	54: "ANGGOTA KABINET KEMENTERIAN",
+	55: "DUTA BESAR",
+	56: "GUBERNUR",
+	57: "WAKIL GUBERNUR",
+	58: "BUPATI",
+	59: "WAKIL BUPATI",
+	60: "WALIKOTA",
+	61: "WAKIL WALIKOTA",
+	62: "ANGGOTA DPRD PROVINSI",
+	63: "ANGGOTA DPRD KABUPATEN/KOTA",
+	64: "DOSEN",
+	65: "GURU",
+	66: "PILOT",
+	67: "PENGACARA",
+	68: "NOTARIS",
+	69: "ARSITEK",
+	70: "AKUNTAN",
+	71: "KONSULTAN",
+	72: "DOKTER",
+	73: "BIDAN",
+	74: "PERAWAT",
+	75: "APOTEKER",
+	76: "PSIKIATER/PSIKOLOG",
+	77: "PENYIAR TELEVISI",
+	78: "PENYIAR RADIO",
+	79: "PELAUT",
+	80: "PENELITI",
+	81: "SOPIR",
+	82: "PIALANG",
+	83: "PARANORMAL",
+	84: "PEDAGANG",
+	85: "PERANGKAT DESA",
+	86: "KEPALA DESA",
+	87: "BIARAWATI",
+	88: "WIRASWASTA",
 	89: "LAINNYA",
 }
 
@@ -130,27 +173,6 @@ var Domisili = map[int]string{
 }
 
 // Helper functions untuk mendapatkan nilai string
-func GetStatusSurat(code int) string {
-	if val, ok := StatusSurat[code]; ok {
-		return val
-	}
-	return ""
-}
-
-func GetStatusSuratKet(code int) string {
-	if val, ok := StatusSuratKet[code]; ok {
-		return val
-	}
-	return ""
-}
-
-func GetGolongan(code string) string {
-	if val, ok := Golongan[code]; ok {
-		return val
-	}
-	return ""
-}
-
 func GetKelamin(code int) string {
 	if val, ok := JenisKelamin[code]; ok {
 		return val
@@ -220,5 +242,3 @@ func GetDomisili(code int) string {
 	}
 	return ""
 }
-
-

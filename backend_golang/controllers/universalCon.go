@@ -3,30 +3,19 @@ package controllers
 import (
 	"backend_golang/models"
 	"backend_golang/setup"
-	"strconv"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
-func DataCount(c *gin.Context) {
-	// Mengambil data user yang sedang login
-	userID, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found", "status": false})
-		return
-	}
-
-	var user models.User
-	if err := setup.DB.First(&user, userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found", "status": false})
-		return
-	}
-
+// computeDataCount menghitung jumlah penduduk & keluarga sesuai hak akses user.
+func computeDataCount(user models.User) gin.H {
 	var pendudukCount int64
 	var keluargaCount int64
 
-	if user.Level == "admin" {
+	if isAdmin(user) {
 		setup.DB.Model(&models.Penduduk{}).Count(&pendudukCount)
 		setup.DB.Model(&models.Keluarga{}).Count(&keluargaCount)
 	} else {
@@ -34,27 +23,15 @@ func DataCount(c *gin.Context) {
 		setup.DB.Model(&models.Keluarga{}).Where("user_id = ?", user.Id).Count(&keluargaCount)
 	}
 
-	c.Keys["response"] = gin.H{"pendudukCount": pendudukCount, "keluargaCount": keluargaCount}
+	return gin.H{"pendudukCount": pendudukCount, "keluargaCount": keluargaCount}
 }
 
-func AliveCount(c *gin.Context) {
-	// Mengambil data user yang sedang login
-	userID, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found", "status": false})
-		return
-	}
-
-	var user models.User
-	if err := setup.DB.First(&user, userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found", "status": false})
-		return
-	}
-
+// computeAliveCount menghitung jumlah penduduk aktif & tidak aktif sesuai hak akses user.
+func computeAliveCount(user models.User) gin.H {
 	var alivepend int64
 	var nopen int64
 
-	if user.Level == "admin" {
+	if isAdmin(user) {
 		setup.DB.Model(&models.Penduduk{}).Where("status = ?", 1).Count(&alivepend)
 		setup.DB.Model(&models.Penduduk{}).Where("status = ?", 2).Count(&nopen)
 	} else {
@@ -62,7 +39,23 @@ func AliveCount(c *gin.Context) {
 		setup.DB.Model(&models.Penduduk{}).Where("user_id = ?", user.Id).Where("status = ?", 2).Count(&nopen)
 	}
 
-	c.Keys["response"] = gin.H{"alivepend": alivepend, "nopen": nopen}
+	return gin.H{"alivepend": alivepend, "nopen": nopen}
+}
+
+func DataCount(c *gin.Context) {
+	user, ok := getCurrentUser(c)
+	if !ok {
+		return
+	}
+	c.JSON(http.StatusOK, computeDataCount(user))
+}
+
+func AliveCount(c *gin.Context) {
+	user, ok := getCurrentUser(c)
+	if !ok {
+		return
+	}
+	c.JSON(http.StatusOK, computeAliveCount(user))
 }
 
 func MarryCount(c *gin.Context) {
@@ -97,10 +90,10 @@ func MarryCount(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"kawin": kawin,
+		"kawin":      kawin,
 		"ceraihidup": ceraihidup,
-		"ceraimati": ceraimati,
-		"belum": belum,
+		"ceraimati":  ceraimati,
+		"belum":      belum,
 	})
 }
 
@@ -130,70 +123,48 @@ func GenderCount(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"laki": laki,
+		"laki":      laki,
 		"perempuan": perempuan,
 	})
 }
 
 func RangeData(c *gin.Context) {
-	// Mengambil data user yang sedang login
-	userID, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found", "status": false})
-		return
-	}
-
-	var user models.User
-	if err := setup.DB.First(&user, userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found", "status": false})
+	user, ok := getCurrentUser(c)
+	if !ok {
 		return
 	}
 
 	// Mengambil parameter year dan month dari query
-	year := c.Query("year")
-	month := c.Query("month")
-	// Konversi string ke int
-	yearInt, _ := strconv.Atoi(year)
-	monthInt, _ := strconv.Atoi(month)
-
-	// Menentukan jumlah hari dalam bulan 
-	var limit int
-	if monthInt == 2 && yearInt%4 == 0 {
-		limit = 29
-	} else if monthInt == 2 && yearInt%4 == 1 {
-		limit = 28
-	} else if monthInt%2 == 1 {
-		limit = 31
-	} else if monthInt%2 == 0 {
-		limit = 30
+	yearInt, err := strconv.Atoi(c.Query("year"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Parameter year tidak valid"})
+		return
+	}
+	monthInt, err := strconv.Atoi(c.Query("month"))
+	if err != nil || monthInt < 1 || monthInt > 12 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Parameter month tidak valid"})
+		return
 	}
 
-	dataPerDay := make([]int64, 0)
+	// Jumlah hari dalam bulan: tanggal 0 bulan berikutnya = hari terakhir bulan ini.
+	// Cara ini otomatis benar untuk tahun kabisat (termasuk aturan abad).
+	limit := time.Date(yearInt, time.Month(monthInt)+1, 0, 0, 0, 0, 0, time.UTC).Day()
 
-	// Query berdasarkan role user
-	if user.Level == "user" {
-		for day := 1; day <= limit; day++ {
-			var count int64
-			setup.DB.Model(&models.Penduduk{}).
-				Where("user_id = ?", user.Id).
-				Where("YEAR(created_at) = ?", year).
-				Where("MONTH(created_at) = ?", month).
-				Where("DAY(created_at) = ?", day).
-				Count(&count)
-			
-			dataPerDay = append(dataPerDay, count)
+	dataPerDay := make([]int64, 0, limit)
+	for day := 1; day <= limit; day++ {
+		var count int64
+		query := setup.DB.Model(&models.Penduduk{}).
+			Where("YEAR(created_at) = ?", yearInt).
+			Where("MONTH(created_at) = ?", monthInt).
+			Where("DAY(created_at) = ?", day)
+
+		// User biasa hanya melihat datanya sendiri; admin melihat semua.
+		if !isAdmin(user) {
+			query = query.Where("user_id = ?", user.Id)
 		}
-	} else if user.Level == "admin" || user.Level == "superAdmin" {
-		for day := 1; day <= limit; day++ {
-			var count int64
-			setup.DB.Model(&models.Penduduk{}).
-				Where("YEAR(created_at) = ?", year).
-				Where("MONTH(created_at) = ?", month).
-				Where("DAY(created_at) = ?", day).
-				Count(&count)
-			
-			dataPerDay = append(dataPerDay, count)
-		}
+
+		query.Count(&count)
+		dataPerDay = append(dataPerDay, count)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -202,28 +173,13 @@ func RangeData(c *gin.Context) {
 }
 
 func AllData(c *gin.Context) {
-	// Mengambil data jumlah dari fungsi DataCount
-	var jumlahResponse gin.H
-	DataCount(c)
-	if c.Writer.Status() != http.StatusOK {
-		return // Jika terjadi error di DataCount, fungsi akan berhenti
+	user, ok := getCurrentUser(c)
+	if !ok {
+		return
 	}
-	c.Writer.Header().Del("Content-Type") // Reset header untuk mencegah multiple response
-	jumlahResponse = c.Keys["response"].(gin.H)
 
-	// Mengambil data status dari fungsi aliveCount
-	var statusResponse gin.H
-	AliveCount(c)
-	if c.Writer.Status() != http.StatusOK {
-		return // Jika terjadi error di aliveCount, fungsi akan berhenti
-	}
-	c.Writer.Header().Del("Content-Type") // Reset header untuk mencegah multiple response
-	statusResponse = c.Keys["response"].(gin.H)
-
-	// Menggabungkan semua data dan mengirim response
 	c.JSON(http.StatusOK, gin.H{
-		"jumlah": jumlahResponse,
-		"status": statusResponse,
+		"jumlah": computeDataCount(user),
+		"status": computeAliveCount(user),
 	})
 }
-

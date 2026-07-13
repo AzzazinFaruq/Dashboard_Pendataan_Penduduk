@@ -4,10 +4,10 @@ import (
 	"backend_golang/config"
 	"backend_golang/models"
 	"backend_golang/setup"
+	"backend_golang/utils"
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -27,16 +27,23 @@ func Index(c *gin.Context) {
 	}
 
 	var keluarga []models.Keluarga
-	var err error
 	var total int64
 
-	if user.Level == "admin" {
-		err = setup.DB.Preload("User").Order("created_at DESC").Find(&keluarga).Error
-	} else {
-		err = setup.DB.Preload("User").Where("user_id = ?", user.Id).Order("created_at DESC").Find(&keluarga).Error
+	query := setup.DB.Preload("User").Order("created_at DESC")
+	countQuery := setup.DB.Model(&models.Keluarga{})
+	if !isAdmin(user) {
+		query = query.Where("user_id = ?", user.Id)
+		countQuery = countQuery.Where("user_id = ?", user.Id)
 	}
 
-	setup.DB.Model(&models.Keluarga{}).Count(&total)
+	countQuery.Count(&total)
+
+	// Pagination opsional: aktif hanya jika ?page= / ?limit= diberikan.
+	if page, limit, ok := paginationParams(c); ok {
+		query = query.Limit(limit).Offset((page - 1) * limit)
+	}
+
+	err := query.Find(&keluarga).Error
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -213,11 +220,18 @@ func LatestForInput(c *gin.Context) {
 func GetKeluargaByID(c *gin.Context) {
 	id := c.Param("id")
 
-	
+	user, ok := getCurrentUser(c)
+	if !ok {
+		return
+	}
 
 	var keluarga models.Keluarga
 	if err := setup.DB.First(&keluarga, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Data tidak ditemukan"})
+		return
+	}
+
+	if !canAccessResource(c, user, keluarga.UserId) {
 		return
 	}
 
@@ -243,6 +257,11 @@ func GetKeluargaByID(c *gin.Context) {
 }
 
 func AddKeluarga(c *gin.Context) {
+
+	user, ok := getCurrentUser(c)
+	if !ok {
+		return
+	}
 
 	var keluarga models.Keluarga
 
@@ -288,67 +307,42 @@ func AddKeluarga(c *gin.Context) {
 		return
 	}
 
-	userId := c.PostForm("user_id")
-	if userId == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID harus diisi"})
-		return
-	}
+	// user_id diambil dari user yang sedang login, bukan dari input client
+	userIdInt := int64(user.Id)
 
 	latitude := c.PostForm("latitude")
 	longtitude := c.PostForm("longtitude")
 
-	isComplete := true
-
-	var noKkInt, userIdInt int64
-	var statusInt int8
 	var latitudeFloat, longtitudeFloat float64
-	var err error
 
-	if noKk != "" {
-		noKkInt, err = strconv.ParseInt(noKk, 10, 64)
-		if err != nil {
-			isComplete = false
-		}
-	} else {
-		isComplete = false
+	// no_kk & status sudah dipastikan tidak kosong di atas; di sini divalidasi formatnya.
+	noKkInt, err := strconv.ParseInt(noKk, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Format No KK tidak valid"})
+		return
 	}
 
-	if status != "" {
-		statusInt64, err := strconv.ParseInt(status, 10, 64)
-		if err != nil {
-			isComplete = false
-		} else {
-			statusInt = int8(statusInt64)
-		}
-	} else {
-		isComplete = false
+	statusInt64, err := strconv.ParseInt(status, 10, 8)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Format Status tidak valid"})
+		return
 	}
+	statusInt := int8(statusInt64)
 
-	if userId != "" {
-		userIdInt, err = strconv.ParseInt(userId, 10, 64)
-		if err != nil {
-			isComplete = false
-		}
-	} else {
-		isComplete = false
-	}
-
+	// Koordinat bersifat opsional, tapi jika diisi harus berupa angka valid.
 	if latitude != "" {
 		latitudeFloat, err = strconv.ParseFloat(latitude, 64)
 		if err != nil {
-			isComplete = false
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Format Latitude tidak valid"})
+			return
 		}
-	} else {
-		isComplete = false
 	}
-
 	if longtitude != "" {
 		longtitudeFloat, err = strconv.ParseFloat(longtitude, 64)
 		if err != nil {
-			isComplete = false
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Format Longitude tidak valid"})
+			return
 		}
-	} else {
-		isComplete = false
 	}
 
 	// Track file yang sudah ditulis ke disk; kalau tx gagal / return early
@@ -364,57 +358,33 @@ func AddKeluarga(c *gin.Context) {
 		}
 	}()
 
-	fotoKk, err := c.FormFile("foto_kk")
-	if err == nil {
-		if !strings.HasSuffix(strings.ToLower(fotoKk.Filename), ".jpg") &&
-			!strings.HasSuffix(strings.ToLower(fotoKk.Filename), ".jpeg") &&
-			!strings.HasSuffix(strings.ToLower(fotoKk.Filename), ".png") {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Format file tidak didukung"})
+	// Foto bersifat opsional.
+	if fotoKk, ferr := c.FormFile("foto_kk"); ferr == nil {
+		uploadPath, verr := utils.ValidateAndBuildImagePath("public/uploads/foto-kk", fotoKk)
+		if verr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": verr.Error()})
 			return
 		}
-
-		if fotoKk.Size > 5*1024*1024 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Ukuran file terlalu besar"})
-			return
-		}
-
-		uploadPath := "public/uploads/foto-kk/" + fotoKk.Filename
 		if err := c.SaveUploadedFile(fotoKk, uploadPath); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Gagal menyimpan foto"})
 			return
 		}
 		savedPaths = append(savedPaths, uploadPath)
 		keluarga.FotoKk = uploadPath
-	} else {
-		isComplete = false
 	}
 
-	FotoRumah, err := c.FormFile("foto_rumah")
-	if err == nil {
-		if !strings.HasSuffix(strings.ToLower(FotoRumah.Filename), ".jpg") &&
-			!strings.HasSuffix(strings.ToLower(FotoRumah.Filename), ".jpeg") &&
-			!strings.HasSuffix(strings.ToLower(FotoRumah.Filename), ".png") {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Format file tidak didukung"})
+	if fotoRumah, ferr := c.FormFile("foto_rumah"); ferr == nil {
+		uploadPath, verr := utils.ValidateAndBuildImagePath("public/uploads/foto-rumah", fotoRumah)
+		if verr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": verr.Error()})
 			return
 		}
-
-		if FotoRumah.Size > 5*1024*1024 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Ukuran file terlalu besar"})
-			return
-		}
-
-		uploadPath := "public/uploads/foto-rumah/" + FotoRumah.Filename
-		if err := c.SaveUploadedFile(FotoRumah, uploadPath); err != nil {
+		if err := c.SaveUploadedFile(fotoRumah, uploadPath); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Gagal menyimpan foto"})
 			return
 		}
 		savedPaths = append(savedPaths, uploadPath)
 		keluarga.FotoRumah = uploadPath
-	} else {
-		isComplete = false
-	}
-
-	if isComplete {
 	}
 
 	newKeluarga := models.Keluarga{
@@ -456,10 +426,19 @@ func AddKeluarga(c *gin.Context) {
 func UpdateKeluarga(c *gin.Context) {
 	id := c.Param("id")
 
+	user, ok := getCurrentUser(c)
+	if !ok {
+		return
+	}
+
 	var keluarga models.Keluarga
 
 	if err := setup.DB.First(&keluarga, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Data keluarga tidak ditemukan"})
+		return
+	}
+
+	if !canAccessResource(c, user, keluarga.UserId) {
 		return
 	}
 
@@ -475,19 +454,11 @@ func UpdateKeluarga(c *gin.Context) {
 
 	fotoKk, err := c.FormFile("foto_kk")
 	if err == nil {
-		if !strings.HasSuffix(strings.ToLower(fotoKk.Filename), ".jpg") &&
-			!strings.HasSuffix(strings.ToLower(fotoKk.Filename), ".jpeg") &&
-			!strings.HasSuffix(strings.ToLower(fotoKk.Filename), ".png") {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Format file tidak didukung"})
+		uploadPath, verr := utils.ValidateAndBuildImagePath("public/uploads/foto-kk", fotoKk)
+		if verr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": verr.Error()})
 			return
 		}
-
-		if fotoKk.Size > 5*1024*1024 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Ukuran file terlalu besar"})
-			return
-		}
-
-		uploadPath := "public/uploads/foto-kk/" + fotoKk.Filename
 		if err := c.SaveUploadedFile(fotoKk, uploadPath); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Gagal menyimpan foto"})
 			return
@@ -497,19 +468,11 @@ func UpdateKeluarga(c *gin.Context) {
 
 	FotoRumah, err := c.FormFile("foto_rumah")
 	if err == nil {
-		if !strings.HasSuffix(strings.ToLower(FotoRumah.Filename), ".jpg") &&
-			!strings.HasSuffix(strings.ToLower(FotoRumah.Filename), ".jpeg") &&
-			!strings.HasSuffix(strings.ToLower(FotoRumah.Filename), ".png") {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Format file tidak didukung"})
+		uploadPath, verr := utils.ValidateAndBuildImagePath("public/uploads/foto-rumah", FotoRumah)
+		if verr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": verr.Error()})
 			return
 		}
-
-		if FotoRumah.Size > 5*1024*1024 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Ukuran file terlalu besar"})
-			return
-		}
-
-		uploadPath := "public/uploads/foto-rumah/" + FotoRumah.Filename
 		if err := c.SaveUploadedFile(FotoRumah, uploadPath); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Gagal menyimpan foto"})
 			return
@@ -547,21 +510,19 @@ func UpdateKeluarga(c *gin.Context) {
 	}
 
 	if latitude != "" {
-		latitudeFloat, err := strconv.ParseFloat(latitude, 64)
+		latitudeFloat, err = strconv.ParseFloat(latitude, 64)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Format Status tidak valid"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Format Latitude tidak valid"})
 			return
 		}
-		statusInt = int8(latitudeFloat)
 	}
 
 	if longtitude != "" {
-		longtitudeFloat, err := strconv.ParseFloat(longtitude, 64)
+		longtitudeFloat, err = strconv.ParseFloat(longtitude, 64)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Format Status tidak valid"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Format Longitude tidak valid"})
 			return
 		}
-		statusInt = int8(longtitudeFloat)
 	}
 
 	tx := setup.DB.Begin()
@@ -603,7 +564,6 @@ func UpdateKeluarga(c *gin.Context) {
 		updateData["longtitude"] = longtitudeFloat
 	}
 
-
 	if err := tx.Model(&keluarga).Updates(updateData).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengupdate data: " + err.Error()})
@@ -622,6 +582,11 @@ func UpdateKeluarga(c *gin.Context) {
 func DeleteKeluarga(c *gin.Context) {
 	id := c.Param("id")
 
+	user, ok := getCurrentUser(c)
+	if !ok {
+		return
+	}
+
 	var keluarga models.Keluarga
 	if err := setup.DB.First(&keluarga, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
@@ -630,11 +595,22 @@ func DeleteKeluarga(c *gin.Context) {
 		return
 	}
 
+	if !canAccessResource(c, user, keluarga.UserId) {
+		return
+	}
+
 	if err := setup.DB.Delete(&keluarga).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"message": "Gagal menghapus data keluarga",
 		})
 		return
+	}
+
+	// Hapus file foto yang terkait agar tidak menjadi sampah di disk.
+	for _, p := range []string{keluarga.FotoKk, keluarga.FotoRumah} {
+		if p != "" {
+			_ = os.Remove(p)
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{

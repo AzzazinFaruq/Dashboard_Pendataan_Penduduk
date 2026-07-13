@@ -3,22 +3,32 @@ package utils
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var jwtSecret = []byte("secret")
+// getJWTSecret mengambil secret dari environment variable JWT_SECRET.
+// Aplikasi menolak jalan tanpa secret agar tidak memakai nilai default yang tidak aman.
+func getJWTSecret() []byte {
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		log.Fatal("JWT_SECRET tidak diset. Set environment variable JWT_SECRET terlebih dahulu.")
+	}
+	return []byte(secret)
+}
 
-// generate token JWT
-func GenerateJWT(userID uint) (string, error) {
+// GenerateJWT membuat token JWT untuk userID dengan masa berlaku sesuai duration.
+func GenerateJWT(userID uint, duration time.Duration) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": userID,
-		"exp": time.Now().Add(time.Hour * 24).Unix(), // Token valid selama 1 hari
+		"exp": time.Now().Add(duration).Unix(),
 	})
 
 	// Sign token with secret key
-	tokenString, err := token.SignedString(jwtSecret)
+	tokenString, err := token.SignedString(getJWTSecret())
 	if err != nil {
 		return "", err
 	}
@@ -32,7 +42,7 @@ func ValidateJWT(tokenString string) (*jwt.Token, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return jwtSecret, nil
+		return getJWTSecret(), nil
 	})
 
 	if err != nil {

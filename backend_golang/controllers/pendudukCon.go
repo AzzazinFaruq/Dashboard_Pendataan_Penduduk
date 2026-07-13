@@ -25,16 +25,23 @@ func GetPenduduk(c *gin.Context) {
 	}
 
 	var penduduk []models.Penduduk
-	var err error
 	var total int64
 
-	if user.Level == "admin" {
-		err = setup.DB.Preload("User").Preload("Keluarga").Order("created_at DESC").Find(&penduduk).Error
-	} else {
-		err = setup.DB.Preload("User").Preload("Keluarga").Where("user_id = ?", user.Id).Order("created_at DESC").Find(&penduduk).Error
+	query := setup.DB.Preload("User").Preload("Keluarga").Order("created_at DESC")
+	countQuery := setup.DB.Model(&models.Penduduk{})
+	if !isAdmin(user) {
+		query = query.Where("user_id = ?", user.Id)
+		countQuery = countQuery.Where("user_id = ?", user.Id)
 	}
 
-	setup.DB.Model(&models.Penduduk{}).Count(&total)
+	countQuery.Count(&total)
+
+	// Pagination opsional: aktif hanya jika ?page= / ?limit= diberikan.
+	if page, limit, ok := paginationParams(c); ok {
+		query = query.Limit(limit).Offset((page - 1) * limit)
+	}
+
+	err := query.Find(&penduduk).Error
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -143,13 +150,18 @@ func GetLatestPenduduk(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"user":  user,
-		"data":  formattedPenduduks,
+		"user": user,
+		"data": formattedPenduduks,
 	})
 }
 
 func GetPendudukByID(c *gin.Context) {
 	id := c.Param("id")
+
+	user, ok := getCurrentUser(c)
+	if !ok {
+		return
+	}
 
 	var penduduk models.Penduduk
 	if err := setup.DB.Preload("Keluarga").Preload("User").First(&penduduk, id).Error; err != nil {
@@ -157,9 +169,13 @@ func GetPendudukByID(c *gin.Context) {
 		return
 	}
 
+	if !canAccessResource(c, user, penduduk.UserId) {
+		return
+	}
+
 	hasil := map[string]interface{}{
 		"id":         penduduk.Id,
-		"kels_id":   penduduk.KelsId,
+		"kels_id":    penduduk.KelsId,
 		"nomer_kk":   penduduk.Keluarga.NoKk,
 		"nik":        penduduk.Nik,
 		"nama":       penduduk.Nama,
@@ -185,6 +201,11 @@ func GetPendudukByID(c *gin.Context) {
 }
 
 func AddPenduduk(c *gin.Context) {
+	user, ok := getCurrentUser(c)
+	if !ok {
+		return
+	}
+
 	var input struct {
 		KelsId     int64     `json:"kels_id" binding:"required"`
 		Nik        int64     `json:"nik" binding:"required"`
@@ -203,13 +224,11 @@ func AddPenduduk(c *gin.Context) {
 		NoHp       string    `json:"no_hp"`
 		Domisili   int8      `json:"domisili"`
 		Status     int8      `json:"stat"`
-		UserId     int64     `json:"user_id"`
-
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
+			"error":   err.Error(),
 			"valid":   false,
 			"message": "Pastikan form sudah terisi dengan benar",
 		})
@@ -234,12 +253,12 @@ func AddPenduduk(c *gin.Context) {
 		NoHp:       input.NoHp,
 		Domisili:   input.Domisili,
 		Status:     input.Status,
-		UserId:     input.UserId,
+		UserId:     int64(user.Id),
 	}
 
 	if err := setup.DB.Create(&penduduk).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": err.Error(),
+			"error":   err.Error(),
 			"valid":   false,
 			"message": "Gagal menambah penduduk",
 		})
@@ -255,36 +274,53 @@ func AddPenduduk(c *gin.Context) {
 func UpdatePenduduk(c *gin.Context) {
 	id := c.Param("id")
 
+	user, ok := getCurrentUser(c)
+	if !ok {
+		return
+	}
+
 	var penduduk models.Penduduk
 	if err := setup.DB.First(&penduduk, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"status": false,
+			"status":  false,
 			"message": "Data tidak ditemukan",
 		})
 		return
 	}
 
+	if !canAccessResource(c, user, penduduk.UserId) {
+		return
+	}
+
+	// Simpan pemilik & id asli agar tidak bisa diubah lewat body request
+	originalID := penduduk.Id
+	originalUserID := penduduk.UserId
+
 	// Update field satu per satu
 	if err := c.ShouldBindJSON(&penduduk); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err,
-			"status": false,
+			"error":   err,
+			"status":  false,
 			"message": "Pastikan form sudah terisi dengan benar",
 		})
 		return
 	}
 
+	// Kembalikan id & pemilik ke nilai asli (cegah reassignment)
+	penduduk.Id = originalID
+	penduduk.UserId = originalUserID
+
 	// Gunakan Save() untuk memperbarui semua field
 	if err := setup.DB.Save(&penduduk).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status": false,
+			"status":  false,
 			"message": "Gagal mengupdate penduduk",
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status": true,
+		"status":  true,
 		"message": "Sukses mengupdate penduduk",
 	})
 }
@@ -292,11 +328,20 @@ func UpdatePenduduk(c *gin.Context) {
 func DeletePenduduk(c *gin.Context) {
 	id := c.Param("id")
 
+	user, ok := getCurrentUser(c)
+	if !ok {
+		return
+	}
+
 	var penduduk models.Penduduk
 	if err := setup.DB.First(&penduduk, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"message": "Data penduduk tidak ditemukan",
 		})
+		return
+	}
+
+	if !canAccessResource(c, user, penduduk.UserId) {
 		return
 	}
 

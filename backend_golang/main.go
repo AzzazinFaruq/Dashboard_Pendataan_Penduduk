@@ -11,10 +11,11 @@ import (
 func main() {
 	//Declare New Gin Route System
 	router := gin.New()
+	// Logger mencatat request; Recovery mencegah satu panic mematikan seluruh server.
+	router.Use(gin.Logger(), gin.Recovery())
 	router.Use(middleware.CORSMiddleware())
 	//Run Database Setup
 	setup.ConnectDatabase()
-	
 
 	//Auth
 	router.POST("/register", controllers.Register)
@@ -51,7 +52,7 @@ func main() {
 	protected.GET("/alldata", controllers.AllData)
 	protected.GET("/jumlah", controllers.DataCount)
 	protected.GET("/alive", controllers.AliveCount)
-	protected.GET("/marry", controllers.MarryCount) 
+	protected.GET("/marry", controllers.MarryCount)
 	protected.GET("/gender", controllers.GenderCount)
 	protected.GET("/data", controllers.RangeData)
 

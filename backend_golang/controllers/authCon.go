@@ -82,7 +82,7 @@ func Login(c *gin.Context) {
 		tokenDuration = 24 * time.Hour
 	}
 
-	tokenString, err := utils.GenerateJWT(uint(user.Id))
+	tokenString, err := utils.GenerateJWT(uint(user.Id), tokenDuration)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Failed to generate token", "authenticated": false})
 		return
